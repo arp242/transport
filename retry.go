@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,6 +15,15 @@ type retry struct {
 }
 
 var retryTesthook func(i int, resp *http.Response, err error, d time.Duration)
+
+type cancelCloser struct {
+	io.ReadCloser
+	cancel func()
+}
+
+func (c cancelCloser) Close() error { c.cancel(); return c.ReadCloser.Close() }
+
+var _ io.ReadCloser = cancelCloser{}
 
 func (t retry) RoundTrip(r *http.Request) (*http.Response, error) {
 	var (
@@ -28,10 +38,17 @@ func (t retry) RoundTrip(r *http.Request) (*http.Response, error) {
 		if t.timeout > 0 {
 			ctx2, cancel = context.WithTimeout(ctx, t.timeout)
 			r = r.Clone(ctx2)
-			defer cancel()
 		}
 
 		resp, err := t.parent.RoundTrip(r)
+		if resp != nil && resp.Body != nil && cancel != nil {
+			// Call cancel() on resp.Body.Close instead of defer, since that can
+			// be called too soon and http.Client will pick up on it.
+			//
+			// TODO: doesn't show in tests as they're too fast(?) Should write a
+			// test for it.
+			resp.Body = cancelCloser{resp.Body, cancel}
+		}
 		if err == nil && resp.StatusCode < 400 {
 			return resp, err
 		}
@@ -41,6 +58,9 @@ func (t retry) RoundTrip(r *http.Request) (*http.Response, error) {
 			retryTesthook(i, resp, err, d)
 		}
 		if d < 0 {
+			if resp == nil && cancel != nil {
+				cancel()
+			}
 			return resp, err
 		}
 		time.Sleep(d)
