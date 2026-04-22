@@ -166,6 +166,7 @@ func (s *cacheFile) Get(r *http.Request) (*http.Response, error, bool) {
 		}
 		return nil, nil, false
 	}
+	defer fp.Close()
 
 	var cached struct {
 		http.Response
