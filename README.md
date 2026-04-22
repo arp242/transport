@@ -11,6 +11,8 @@ Included transports:
 
 - Filter – filter some requests, such as local/private addresses.
 
+- Intercept – intercept responses and change the response or error, useful to e.g. automatically return errors on 5xx responses.
+
 - Log – print logs for debugging.
 
 Every transport accepts a parent transport; multiple transports can be used by
@@ -74,6 +76,15 @@ Filter
 c := http.Client{
     // Disallow all requests to local/private addresses such as localhost, 10/8, etc.
     Transport: transport.Filter(http.DefaultTransport, transport.FilterLocal),
+}
+```
+
+Intercept
+---------
+```go
+c := http.Client{
+    // Return an error on all status codes >=400.
+    Transport: transport.Intercept(http.DefaultTransport, transport.HTTPError(false, 1024)),
 }
 ```
 

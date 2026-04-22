@@ -123,6 +123,26 @@ func ExampleFilter() {
 	// true
 }
 
+func ExampleIntercept() {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		w.Write([]byte("error text from HTTP handler"))
+	}))
+	defer srv.Close()
+
+	c := http.Client{
+		// Return an error on all status codes >=400.
+		Transport: transport.Intercept(http.DefaultTransport, transport.HTTPError(false, 1024)),
+	}
+	_, err := c.Get(srv.URL)
+
+	// Replace some dynamic text with static text for test.
+	fmt.Println(regexp.MustCompile(`(Get "http://.+?):\d+"`).ReplaceAllString(err.Error(), `$1:80"`))
+
+	// Output:
+	// Get "http://127.0.0.1:80": HTTP status 500: error text from HTTP handler
+}
+
 func ExampleLog() {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Handle"))
