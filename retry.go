@@ -27,7 +27,7 @@ func (t retry) RoundTrip(r *http.Request) (*http.Response, error) {
 		)
 		if t.timeout > 0 {
 			ctx2, cancel = context.WithTimeout(ctx, t.timeout)
-			*r = *r.WithContext(ctx2)
+			r = r.Clone(ctx2)
 			defer cancel()
 		}
 
