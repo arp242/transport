@@ -26,6 +26,8 @@ const (
 func (l LogOption) has(ll LogOption) bool { return l&ll != 0 }
 
 // Log writes request and/or response details to out.
+//
+// Any addition values from [LogContext], if any, are also printed.
 func Log(parent http.RoundTripper, out io.Writer, what LogOption) *log {
 	bold, reset := "", ""
 	if os.Getenv("NO_COLOR") == "" {
@@ -52,8 +54,19 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 		if r.Method != "" {
 			method = r.Method
 		}
-
 		fmt.Fprintf(t.out, "%sREQ │ %s %s HTTP/%d.%d%s\n", t.bold, method, reqURI, r.ProtoMajor, r.ProtoMinor, t.reset)
+
+		if attrs, ok := getLogContext(r.Context()); ok {
+			var l int
+			for _, a := range attrs {
+				l = max(l, len(a.Key))
+			}
+
+			f := "CTX │     %-" + strconv.Itoa(l) + "s = %s\n"
+			for _, a := range attrs {
+				fmt.Fprintf(t.out, f, a.Key, a.Value)
+			}
+		}
 	}
 
 	// Log request headers via trace, so we can log exactly what's being sent.

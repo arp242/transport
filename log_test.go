@@ -2,6 +2,9 @@ package transport
 
 import (
 	"bytes"
+	"context"
+	"log/slog"
+
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +13,91 @@ import (
 	"testing"
 	"testing/synctest"
 )
+
+func TestLogContext(t *testing.T) {
+	tests := []struct {
+		args []any
+		want string
+	}{
+		{[]any{"requestID", "abc", "userID", 123, "trace", []string{"a", "b"}}, `
+			REQ │ GET / HTTP/1.1
+			CTX │     requestID = abc
+			CTX │     userID    = 123
+			CTX │     trace     = [a b]
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+		{[]any{}, `
+			REQ │ GET / HTTP/1.1
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+		{[]any{slog.Any("key", "val"), slog.Int("i", 123)}, `
+			REQ │ GET / HTTP/1.1
+			CTX │     key = val
+			CTX │     i   = 123
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+
+		{[]any{slog.Group("g", slog.Any("key", "val"), slog.Int("i", 123))}, `
+			REQ │ GET / HTTP/1.1
+			CTX │     g = [key=val i=123]
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+
+		{[]any{123, "val"}, `
+			REQ │ GET / HTTP/1.1
+			CTX │     !BADKEY = 123
+			CTX │     !BADKEY = val
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+		{[]any{"key", "val", "2nd"}, `
+			REQ │ GET / HTTP/1.1
+			CTX │     key     = val
+			CTX │     !BADKEY = 2nd
+			REQ │ Host:            %HOST%
+			REQ │ Accept-Encoding: gzip
+			REQ │ User-Agent:      Go-http-client/1.1
+		`[1:]},
+	}
+	for _, tt := range tests {
+		synctest.Test(t, func(t *testing.T) { // synctest for consistent time.
+			srv := httptest.NewServer(nil)
+			defer srv.Close()
+
+			have := new(bytes.Buffer)
+			r, _ := http.NewRequest("GET", srv.URL, nil)
+			*r = *r.WithContext(LogContext(context.Background(), tt.args...))
+			c := &http.Client{
+				Transport: Log(http.DefaultTransport, have, LogRequestHeaders),
+			}
+
+			resp, err := c.Do(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+
+			h := have.String()
+			tt.want = strings.ReplaceAll(tt.want, "\t", "")
+			tt.want = strings.ReplaceAll(tt.want, "·\n", " \n")
+			tt.want = strings.ReplaceAll(tt.want, "%HOST%", srv.Listener.Addr().String())
+			if h != tt.want {
+				t.Errorf("\nhave:\n%s\nwant:\n%s", h, tt.want)
+				//t.Logf("have: %q", h)
+				//t.Logf("want: %q", tt.want)
+			}
+		})
+	}
+}
 
 func TestLog(t *testing.T) {
 	tests := []struct {
