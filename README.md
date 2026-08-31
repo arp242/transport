@@ -15,6 +15,8 @@ Included transports:
 
 - Log – print logs for debugging.
 
+- Record – record requests and responses to persistent storage (e.g. a database).
+
 Every transport accepts a parent transport; multiple transports can be used by
 calling several of them. For example:
 
@@ -95,5 +97,22 @@ Log
 c := http.Client{
     // Log request and response headers and body.
     Transport: transport.Log(http.DefaultTransport, buf, transport.LogAll),
+}
+```
+
+Record
+------
+
+```go
+c := http.Client{
+    Transport: transport.Record(http.DefaultTransport,
+	    func(method, url string, attr []slog.Attr, reqHeader http.Header, reqBody io.Reader, reqErr error) (id string) {
+	        // Record request...
+	        return
+	    },
+		func(id string, status int, respHeader http.Header, respBody io.Reader, roundtripErr error) {
+	        // Record response...
+        },
+    ),
 }
 ```

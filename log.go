@@ -82,6 +82,8 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 	if t.what.has(LogRequestBody) {
 		var b []byte
 		if r.Body != nil && r.Body != http.NoBody {
+			// TODO: allow limiting the amount of data we read, and do something
+			// with the error here (similar to Record).
 			b, _ = io.ReadAll(r.Body)
 			r.Body = io.NopCloser(bytes.NewReader(b))
 		}
@@ -115,6 +117,8 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 		var b []byte
 		if resp.Body != nil && resp.Body != http.NoBody {
+			// TODO: allow limiting the amount of data we read, and do something
+			// with the error here (similar to Record).
 			b, _ = io.ReadAll(resp.Body)
 			resp.Body = io.NopCloser(bytes.NewReader(b))
 		}
@@ -144,8 +148,6 @@ func printHeaders(out io.Writer, prefix string, header http.Header) {
 	}
 }
 
-// TODO: instead of reading the entire body, we can wrap it in a reader that
-// prints as it's read. I think that should work?
 func printBody(out io.Writer, prefix string, b []byte) {
 	if b == nil {
 		fmt.Fprint(out, prefix)
