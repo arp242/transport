@@ -56,7 +56,7 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 		fmt.Fprintf(t.out, "%sREQ │ %s %s HTTP/%d.%d%s\n", t.bold, method, reqURI, r.ProtoMajor, r.ProtoMinor, t.reset)
 
-		if attrs, ok := getLogContext(r.Context()); ok {
+		if attrs, ok := LogContext(r.Context()); ok {
 			var l int
 			for _, a := range attrs {
 				l = max(l, len(a.Key))

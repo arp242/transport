@@ -49,7 +49,7 @@ type record struct {
 }
 
 func (t record) RoundTrip(r *http.Request) (*http.Response, error) {
-	attrs, _ := getLogContext(r.Context())
+	attrs, _ := LogContext(r.Context())
 	uri, m := r.RequestURI, "GET"
 	if uri == "" {
 		uri = r.URL.RequestURI()

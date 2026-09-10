@@ -7,15 +7,17 @@ import (
 
 var ctxkey = &struct{}{}
 
-// LogContext adds key-value pairs as context values, which are logged in the
-// [Log] transport.
+// WithLogContext adds key-value pairs as context values, which are logged in
+// the [Log] and [Record] transports. Or use [LogContext] to retrieve the
+// values.
 //
 // The key-value pairs work like the [slog] package (and accepts [slog.Attr]).
-func LogContext(ctx context.Context, args ...any) context.Context {
+func WithLogContext(ctx context.Context, args ...any) context.Context {
 	return context.WithValue(ctx, ctxkey, argsToAttrSlice(args))
 }
 
-func getLogContext(ctx context.Context) ([]slog.Attr, bool) {
+// LogContext gets values added with [WithLogContext].
+func LogContext(ctx context.Context) ([]slog.Attr, bool) {
 	v := ctx.Value(ctxkey)
 	vv, ok := v.([]slog.Attr)
 	return vv, ok

@@ -75,7 +75,7 @@ func TestLogContext(t *testing.T) {
 
 			have := new(bytes.Buffer)
 			r, _ := http.NewRequest("GET", srv.URL, nil)
-			*r = *r.WithContext(LogContext(context.Background(), tt.args...))
+			*r = *r.WithContext(WithLogContext(context.Background(), tt.args...))
 			c := &http.Client{
 				Transport: Log(http.DefaultTransport, have, LogRequestHeaders),
 			}

@@ -20,7 +20,7 @@ func TestRecord(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ctx := LogContext(t.Context(), "key", "val", "k2", 123)
+	ctx := WithLogContext(t.Context(), "key", "val", "k2", 123)
 	ctxCancel, cancel := context.WithCancel(ctx)
 
 	tests := []struct {
