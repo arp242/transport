@@ -103,28 +103,35 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	resp, err := t.parent.RoundTrip(r)
 
-	if (t.what.has(LogRequestHeaders) || t.what.has(LogRequestBody)) &&
-		(t.what.has(LogResponseHeaders) || t.what.has(LogResponseBody)) {
+	logResp := t.what.has(LogResponseHeaders) || t.what.has(LogResponseBody)
+
+	if (t.what.has(LogRequestHeaders) || t.what.has(LogRequestBody)) && logResp {
 		fmt.Fprint(t.out, "    ├"+strings.Repeat("─", 60)+"\n")
 	}
 
-	if resp != nil && t.what.has(LogResponseHeaders) {
-		printHeaders(t.out, "RES │ ", resp.Header)
-	}
-	if t.what.has(LogResponseBody) {
+	if err != nil && logResp {
+		fmt.Fprintf(t.out, "RES │ error: %s\n", err)
+	} else if err == nil {
 		if t.what.has(LogResponseHeaders) {
-			fmt.Fprintln(t.out, "RES │")
+			printHeaders(t.out, "RES │ ", resp.Header)
 		}
-		var b []byte
-		if resp.Body != nil && resp.Body != http.NoBody {
-			// TODO: allow limiting the amount of data we read, and do something
-			// with the error here (similar to Record).
-			b, _ = io.ReadAll(resp.Body)
-			resp.Body = io.NopCloser(bytes.NewReader(b))
+		if t.what.has(LogResponseBody) {
+			if t.what.has(LogResponseHeaders) {
+				fmt.Fprintln(t.out, "RES │")
+			}
+			var b []byte
+			if resp.Body != nil && resp.Body != http.NoBody {
+				// TODO: allow limiting the amount of data we read, and do something
+				// with the error here (similar to Record).
+				b, _ = io.ReadAll(resp.Body)
+				resp.Body = io.NopCloser(bytes.NewReader(b))
+			}
+			printBody(t.out, "RES │ ", b)
 		}
-		printBody(t.out, "RES │ ", b)
 	}
-
+	//if logResp {
+	//	fmt.Fprint(t.out, "    └"+strings.Repeat("─", 60)+"\n")
+	//}
 	return resp, err
 }
 
