@@ -38,7 +38,7 @@ func TestRecord(t *testing.T) {
 				"bodyErr": nil,
 				"err":     nil,
 				"method":  "POST",
-				"url":     "/",
+				"url":     srv.URL,
 				"attr":    []slog.Attr{slog.String("key", "val"), slog.Int("k2", 123)},
 				"headers": http.Header{
 					"Accept-Encoding": []string{"gzip"},
@@ -64,7 +64,7 @@ func TestRecord(t *testing.T) {
 				"bodyErr": nil,
 				"err":     nil,
 				"method":  "POST",
-				"url":     "/",
+				"url":     srv.URL,
 				"attr":    []slog.Attr{slog.String("key", "val"), slog.Int("k2", 123)},
 				"headers": http.Header{
 					"Accept-Encoding": []string{"gzip"},
@@ -94,7 +94,7 @@ func TestRecord(t *testing.T) {
 				"bodyErr": nil,
 				"err":     "dial tcp 127.0.0.99:123: connect: connection refused",
 				"method":  "POST",
-				"url":     "/",
+				"url":     "http://127.0.0.99:123",
 				"attr":    []slog.Attr{slog.String("key", "val"), slog.Int("k2", 123)},
 				"headers": http.Header(nil),
 			},
