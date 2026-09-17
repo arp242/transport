@@ -5,11 +5,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -155,6 +158,20 @@ type cacheFile struct {
 	path string
 }
 
+var unmarshaler = json.WithUnmarshalers(
+	json.UnmarshalFromFunc(func(dec *jsontext.Decoder, b *big.Int) error {
+		if dec.PeekKind() != jsontext.KindString {
+			return errors.ErrUnsupported
+		}
+		v, err := dec.ReadValue()
+		if err != nil {
+			return err
+		}
+		b.SetString(v.String(), 10)
+		return nil
+	}),
+)
+
 func (s *cacheFile) Get(r *http.Request) (*http.Response, error, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -162,7 +179,7 @@ func (s *cacheFile) Get(r *http.Request) (*http.Response, error, bool) {
 	fp, err := os.Open(s.cachepath(r))
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			_ = err // XXX: do something with this error?
+			fmt.Fprintf(os.Stderr, "cacheFile.Get: %s\n", err)
 		}
 		return nil, nil, false
 	}
@@ -173,9 +190,10 @@ func (s *cacheFile) Get(r *http.Request) (*http.Response, error, bool) {
 		Body  []byte
 		Error error
 	}
-	err = json.NewDecoder(fp).Decode(&cached)
+
+	err = json.UnmarshalRead(fp, &cached, unmarshaler)
 	if err != nil {
-		_ = err // XXX: do something with this error?
+		fmt.Fprintf(os.Stderr, "cacheFile.Get: %s\n", err)
 		return nil, nil, false
 	}
 
@@ -190,6 +208,12 @@ func (s *cacheFile) Get(r *http.Request) (*http.Response, error, bool) {
 	return resp, cached.Error, true
 }
 
+var marshaler = json.WithMarshalers(
+	json.MarshalToFunc(func(enc *jsontext.Encoder, b *big.Int) error {
+		return enc.WriteToken(jsontext.String(b.String()))
+	}),
+)
+
 func (s *cacheFile) Put(r *http.Request, resp *http.Response, respErr error) {
 	var b []byte
 	if resp != nil && resp.Body != nil && resp.Body != http.NoBody {
@@ -197,28 +221,29 @@ func (s *cacheFile) Put(r *http.Request, resp *http.Response, respErr error) {
 		b, err = io.ReadAll(resp.Body)
 		resp.Body = io.NopCloser(bytes.NewReader(b))
 		if err != nil {
-			_ = err // XXX: do something with this error?
+			fmt.Fprintf(os.Stderr, "cacheFile.Put: %s\n", err)
 			return
 		}
 	}
 
-	//lint:ignore SA1026 https://github.com/dominikh/go-tools/issues/1712
 	j, err := json.Marshal(struct {
 		*http.Response
 		Body    []byte
 		Error   error
 		URL     string
 		Request *http.Request
-	}{Response: resp, Error: respErr, URL: r.URL.String(), Body: b})
+	}{Response: resp, Error: respErr, URL: r.URL.String(), Body: b}, marshaler, json.FormatNilSliceAsNull(true))
 	if err != nil {
-		_ = err // XXX: do something with this error?
+		fmt.Fprintf(os.Stderr, "cacheFile.Put: %s\n", err)
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	err = os.WriteFile(s.cachepath(r), j, 0o777)
-	_ = err // XXX: do something with this error?
+	err = os.WriteFile(s.cachepath(r), j, 0o666)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cacheFile.Put: %s\n", err)
+	}
 }
 
 func (s *cacheFile) cachepath(r *http.Request) string {

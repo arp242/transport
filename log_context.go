@@ -5,7 +5,7 @@ import (
 	"log/slog"
 )
 
-var ctxkey = &struct{}{}
+var ctxkey = &struct{ n string }{"logctx"}
 
 // WithLogContext adds key-value pairs as context values, which are logged in
 // the [Log] and [Record] transports. Or use [LogContext] to retrieve the
