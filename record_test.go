@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -191,4 +192,47 @@ func TestRecord(t *testing.T) {
 			}
 		})
 	}
+}
+
+type errReader struct {
+	readFirst []byte
+	thenError error
+}
+
+func (r *errReader) Read(b []byte) (int, error) {
+	if len(r.readFirst) > 0 {
+		n := copy(b, r.readFirst)
+		r.readFirst = r.readFirst[n:]
+		return n, nil
+	}
+
+	return 0, r.thenError
+}
+
+func TestRecordErrorRequestBody(t *testing.T) {
+	c := &http.Client{
+		Transport: Record(http.DefaultTransport, 16,
+			func(ctx context.Context, method, url string, attr []slog.Attr, reqHeader http.Header, reqBody io.Reader, reqErr error) (id string) {
+				if reqErr == nil || reqErr.Error() != "oh noes" {
+					t.Errorf("wrong error: %v", reqErr)
+				}
+				return ""
+			},
+			func(ctx context.Context, id string, status int, respHeader http.Header, respBody io.Reader, roundtripErr error) {
+				t.Error("RecordResponse was called")
+			},
+		),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("server text"))
+	}))
+	defer srv.Close()
+	r, _ := http.NewRequest("POST", srv.URL, &errReader{[]byte("body text"), errors.New("oh noes")})
+
+	_, err := c.Do(r)
+	if err == nil {
+		t.Fatal("error is nil?")
+	}
+
 }

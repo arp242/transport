@@ -63,7 +63,7 @@ func (t record) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Body, b = zio.CopyReader(r.Body, t.limit)
 	r = r.WithContext(httptrace.WithClientTrace(r.Context(), &httptrace.ClientTrace{
 		WroteHeaderField: func(k string, v []string) { h[k] = v },
-		WroteRequest:     func(info httptrace.WroteRequestInfo) { id = t.recordRequest(r.Context(), m, uri, attrs, h, b, nil) },
+		WroteRequest:     func(i httptrace.WroteRequestInfo) { id = t.recordRequest(r.Context(), m, uri, attrs, h, b, i.Err) },
 	}))
 
 	resp, rtErr := t.parent.RoundTrip(r)
