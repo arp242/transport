@@ -75,7 +75,7 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 	if t.what.has(LogRequestHeaders) {
 		h := make(http.Header)
 		trace = &httptrace.ClientTrace{
-			WroteHeaderField: func(k string, v []string) { h[k] = v },
+			WroteHeaderField: func(k string, v []string) { h[http.CanonicalHeaderKey(k)] = v },
 			WroteHeaders:     func() { printHeaders(t.out, "REQ │ ", h) },
 		}
 	}
