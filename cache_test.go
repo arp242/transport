@@ -157,7 +157,7 @@ func TestCacheFile(t *testing.T) {
 	}
 
 	t.Run("http", func(t *testing.T) { test(t, httptest.NewServer) })
-	t.Run("https", func(t *testing.T) { test(t, httptest.NewServer) })
+	t.Run("https", func(t *testing.T) { test(t, httptest.NewTLSServer) })
 }
 
 func TestCacheAge(t *testing.T) {

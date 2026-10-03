@@ -112,6 +112,9 @@ func (t log) RoundTrip(r *http.Request) (*http.Response, error) {
 	if err != nil && logResp {
 		fmt.Fprintf(t.out, "RES │ error: %s\n", err)
 	} else if err == nil {
+		if logResp {
+			fmt.Fprintf(t.out, "RES │ %s\n", resp.Status)
+		}
 		if t.what.has(LogResponseHeaders) {
 			printHeaders(t.out, "RES │ ", resp.Header)
 		}

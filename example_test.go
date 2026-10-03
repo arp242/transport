@@ -176,6 +176,7 @@ func ExampleLog() {
 	// REQ │
 	// REQ │ [1, 2, 3]
 	//     ├────────────────────────────────────────────────────────────
+	// RES │ 200 OK
 	// RES │ Content-Length: 6
 	// RES │ Content-Type:   text/plain; charset=utf-8
 	// RES │ Date:           Tue, 21 Apr 2026 21:13:48 GMT

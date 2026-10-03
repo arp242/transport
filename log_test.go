@@ -3,10 +3,10 @@ package transport
 import (
 	"bytes"
 	"context"
-	"log/slog"
-
+	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -210,16 +210,19 @@ func TestLog(t *testing.T) {
 		// Response.
 		{LogResponseHeaders, "GET %s", "", `
 			REQ │ GET / HTTP/1.1
+			RES │ 200 OK
 			RES │ Content-Length: 6
 			RES │ Content-Type:   text/plain; charset=utf-8
 			RES │ Date:           Sat, 01 Jan 2000 00:00:00 GMT
 		`[1:]},
 		{LogResponseBody, "GET %s", "", `
 			REQ │ GET / HTTP/1.1
+			RES │ 200 OK
 			RES │ HANDLE
 		`[1:]},
 		{LogResponseHeaders | LogResponseBody, "GET %s", "", `
 			REQ │ GET / HTTP/1.1
+			RES │ 200 OK
 			RES │ Content-Length: 6
 			RES │ Content-Type:   text/plain; charset=utf-8
 			RES │ Date:           Sat, 01 Jan 2000 00:00:00 GMT
@@ -232,6 +235,7 @@ func TestLog(t *testing.T) {
 			REQ │ Accept-Encoding: gzip
 			REQ │ User-Agent:      Go-http-client/1.1
 			    ├────────────────────────────────────────────────────────────
+			RES │ 200 OK
 			RES │ Content-Length: 6
 			RES │ Content-Type:   text/plain; charset=utf-8
 			RES │ Date:           Sat, 01 Jan 2000 00:00:00 GMT
@@ -246,6 +250,7 @@ func TestLog(t *testing.T) {
 			REQ │
 			REQ │ «http.NoBody»
 			    ├────────────────────────────────────────────────────────────
+			RES │ 200 OK
 			RES │ Content-Length: 6
 			RES │ Content-Type:   text/plain; charset=utf-8
 			RES │ Date:           Sat, 01 Jan 2000 00:00:00 GMT
@@ -255,14 +260,14 @@ func TestLog(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+		test := func(t *testing.T, srvfunc func(http.Handler) *httptest.Server) {
 			synctest.Test(t, func(t *testing.T) { // synctest for consistent time.
 				var i int
-				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				srv := srvfunc(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("HANDLE"))
 					i++
 				}))
-				defer srv.Close()
+				t.Cleanup(srv.Close)
 
 				verb, u, _ := strings.Cut(tt.req, " ")
 				var rb io.Reader = strings.NewReader(tt.reqBody)
@@ -277,9 +282,9 @@ func TestLog(t *testing.T) {
 				}
 
 				have := new(bytes.Buffer)
-				c := &http.Client{
-					Transport: Log(http.DefaultTransport, have, tt.what),
-				}
+				tr := http.DefaultTransport.(*http.Transport)
+				tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+				c := &http.Client{Transport: Log(tr, have, tt.what)}
 				resp, err := c.Do(r)
 				if err != nil {
 					t.Fatal(err)
@@ -293,16 +298,21 @@ func TestLog(t *testing.T) {
 					t.Fatalf("body=%s", string(b))
 				}
 
-				tt.want = strings.ReplaceAll(tt.want, "\t", "")
-				tt.want = strings.ReplaceAll(tt.want, "·\n", " \n")
-				tt.want = strings.ReplaceAll(tt.want, "%HOST%", srv.Listener.Addr().String())
+				want := strings.ReplaceAll(tt.want, "\t", "")
+				want = strings.ReplaceAll(want, "·\n", " \n")
+				want = strings.ReplaceAll(want, "%HOST%", srv.Listener.Addr().String())
 				h := have.String()
-				if h != tt.want {
-					t.Errorf("\nhave:\n%s\nwant:\n%s", h, tt.want)
+				if h != want {
+					t.Errorf("\nhave:\n%s\nwant:\n%s", h, want)
 					//t.Logf("have: %q", h)
 					//t.Logf("want: %q", tt.want)
 				}
 			})
+		}
+
+		t.Run("", func(t *testing.T) {
+			t.Run("http", func(t *testing.T) { test(t, httptest.NewServer) })
+			t.Run("https", func(t *testing.T) { test(t, httptest.NewTLSServer) })
 		})
 	}
 }
